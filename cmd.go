@@ -7,7 +7,9 @@ import (
     "github.com/xanzy/go-gitlab"
     "log"
     "os/exec"
+    "syscall"
     "time"
+    "unsafe"
 )
 
 type MR struct {
@@ -113,23 +115,25 @@ type ui struct {
 }
 
 func newUI() *ui {
+    maxX, maxY := termSize()
+
     listView := widgets.NewList()
     listView.Title = "Gitlab MR"
     listView.TextStyle = termui.NewStyle(termui.ColorYellow)
-    //listView.WrapText = false
-    listView.SetRect(1, 1, 100, 30)
+    innerX := int(float32(maxX) * 0.7)
+    listView.SetRect(1, 1, innerX, maxY-3)
 
     linkView := widgets.NewParagraph()
     linkView.Title = "Link"
-    linkView.SetRect(1, 30, 100, 33)
+    linkView.SetRect(1, maxY-3, innerX, maxY)
 
     ownerView := widgets.NewParagraph()
     ownerView.Title = "Owner"
-    ownerView.SetRect(100, 1, 120, 4)
+    ownerView.SetRect(innerX, 1, maxX, 4)
 
     approvalsView := widgets.NewList()
     approvalsView.Title = "Approvals"
-    approvalsView.SetRect(100, 3, 120, 33)
+    approvalsView.SetRect(innerX, 4, maxX, maxY)
 
     res := &ui{
         mrs: []MR{
@@ -189,4 +193,17 @@ func (u *ui) CurrentMR() MR {
 // only works on the macos
 func openURLInBrowser(url string) {
     exec.Command("open", url).Start()
+}
+
+// only works on the macos, and linux
+func termSize() (int, int) {
+    var sz struct {
+        rows    uint16
+        cols    uint16
+        xpixels uint16
+        ypixels uint16
+    }
+    _, _, _ = syscall.Syscall(syscall.SYS_IOCTL,
+        uintptr(syscall.Stdout), uintptr(syscall.TIOCGWINSZ), uintptr(unsafe.Pointer(&sz)))
+    return int(sz.cols), int(sz.rows)
 }
