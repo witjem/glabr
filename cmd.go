@@ -1,27 +1,39 @@
 package main
 
 import (
+    "encoding/json"
     "fmt"
     "github.com/gizak/termui/v3"
     "github.com/gizak/termui/v3/widgets"
     "github.com/xanzy/go-gitlab"
+    "io/ioutil"
     "log"
+    "os"
     "os/exec"
+    usr "os/user"
     "syscall"
     "time"
     "unsafe"
 )
 
-type MR struct {
-    Link         string
-    Project      string
-    Title        string
-    ApprovedByMe bool
-    Owner        string
-    Approved     []string
+type Opts struct {
+    GitlabBaseURL  string         `json:"gitlab_base_url"`
+    GitlabToken    string         `json:"gitlab_token"`
+    GitlabUsername string         `json:"gitlab_username"`
+    Projects       map[string]int `json:"projects"`
 }
 
 func main() {
+    opts, err := parseOpts()
+    if err != nil {
+        log.Fatalf("error: %s", err)
+    }
+
+    gitlabClient, err := NewGitLab(opts)
+    if err != nil {
+        log.Fatalf("error: %s", err)
+    }
+
     if err := termui.Init(); err != nil {
         log.Fatalf("failed to initialize termui: %v", err)
     }
@@ -32,7 +44,7 @@ func main() {
 
     gitlabUpdates := make(chan []MR, 1)
     go func() {
-        gitlabUpdates <- getAllMrs()
+        gitlabUpdates <- gitlabClient.getAllMrs()
         time.Sleep(10 * time.Second)
     }()
     events := termui.PollEvents()
@@ -56,27 +68,66 @@ func main() {
     }
 }
 
-func getAllMrs() []MR {
-    mrsM := [][]MR{
-        getMrs(243, "ims"),
-        getMrs(245, "fle"),
-        getMrs(277, "dss"),
-        getMrs(297, "ats"),
-        getMrs(246, "gtw"),
+func parseOpts() (Opts, error) {
+    current, _ := usr.Current()
+    jsonFile, err := os.Open(current.HomeDir + "/.glab_mr.json")
+    if err != nil {
+        return Opts{}, fmt.Errorf("~/.glab_mr.json not found")
     }
-    mrs := []MR{}
+    defer jsonFile.Close()
+    bytes, err := ioutil.ReadAll(jsonFile)
+    if err != nil {
+        return Opts{}, fmt.Errorf("fail read ~/.glab_mr.json")
+    }
+    var opts Opts
+    err = json.Unmarshal(bytes, &opts)
+    if err != nil {
+        return Opts{}, fmt.Errorf("fail parse ~/.glab_mr.json")
+    }
+    return opts, nil
+}
+
+type MR struct {
+    Link         string
+    Project      string
+    Title        string
+    ApprovedByMe bool
+    Owner        string
+    Approved     []string
+}
+
+type GitLabClient struct {
+    projects map[string]int
+    username string
+    client   *gitlab.Client
+}
+
+func NewGitLab(opts Opts) (*GitLabClient, error) {
+    client, err := gitlab.NewClient(opts.GitlabToken, gitlab.WithBaseURL(opts.GitlabBaseURL))
+    if err != nil {
+        return nil, err
+    }
+    return &GitLabClient{
+        client:   client,
+        username: opts.GitlabUsername,
+        projects: opts.Projects,
+    }, nil
+}
+
+func (g *GitLabClient) getAllMrs() []MR {
+    var mrsM [][]MR
+    for project, id := range g.projects {
+        mrsM = append(mrsM, g.getMrs(id, project))
+    }
+    var mrs []MR
     for _, mr := range mrsM {
         mrs = append(mrs, mr...)
     }
     return mrs
 }
 
-func getMrs(pid int, pName string) []MR {
-    git, err := gitlab.NewClient("k9zB-yyfBSS9tYTyYmxW", gitlab.WithBaseURL("https://gitlab.railsreactor.com/"))
-    if err != nil {
-        log.Fatalf("Failed to create client: %v", err)
-    }
-    mrs, _, _ := git.MergeRequests.ListProjectMergeRequests(pid, &gitlab.ListProjectMergeRequestsOptions{
+func (g *GitLabClient) getMrs(pid int, pName string) []MR {
+    mrs, _, _ := g.client.MergeRequests.ListProjectMergeRequests(pid, &gitlab.ListProjectMergeRequestsOptions{
         ListOptions: gitlab.ListOptions{
             Page:    0,
             PerPage: 10,
@@ -85,11 +136,11 @@ func getMrs(pid int, pName string) []MR {
     })
     res := []MR{}
     for _, mr := range mrs {
-        emojis, _, _ := git.AwardEmoji.ListMergeRequestAwardEmoji(pid, mr.IID, &gitlab.ListAwardEmojiOptions{PerPage: 10})
+        emojis, _, _ := g.client.AwardEmoji.ListMergeRequestAwardEmoji(pid, mr.IID, &gitlab.ListAwardEmojiOptions{PerPage: 10})
         isApproved := false
         approved := []string{}
         for _, emoji := range emojis {
-            if emoji.User.Username == "roman.ilnytskyi" {
+            if emoji.User.Username == g.username {
                 isApproved = true
             }
             approved = append(approved, " "+emoji.User.Username)
