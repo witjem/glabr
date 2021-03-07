@@ -22,7 +22,7 @@ type MR struct {
 
 func main() {
     if err := ui.Init(); err != nil {
-       log.Fatalf("failed to initialize termui: %v", err)
+        log.Fatalf("failed to initialize termui: %v", err)
     }
     defer ui.Close()
 
@@ -34,26 +34,26 @@ func main() {
 
     // Calling Sleep function of go
     go func() {
-       time.Sleep(10 * time.Second)
+        time.Sleep(10 * time.Second)
 
-       // Displayed after sleep overs
-       mychan1 <- "output1"
+        // Displayed after sleep overs
+        mychan1 <- "output1"
     }()
     events := ui.PollEvents()
     for {
-       select {
-       case event := <-events:
-           if event.ID == "q" || event.ID == "й" {
-               return
-           }
-           if event.ID == "r" || event.ID == "к" {
-               g.setMRS(getAllMrs())
-           }
-           g.render(event.ID)
-       case <-mychan1:
-           g.setMRS(getAllMrs())
-           g.render("")
-       }
+        select {
+        case event := <-events:
+            if event.ID == "q" || event.ID == "й" {
+                return
+            }
+            if event.ID == "r" || event.ID == "к" {
+                g.setMRS(getAllMrs())
+            }
+            g.render(event.ID)
+        case <-mychan1:
+            g.setMRS(getAllMrs())
+            g.render("")
+        }
     }
 }
 
@@ -93,7 +93,7 @@ func getMrs(pid int, pName string) []MR {
             if emoji.User.Username == "roman.ilnytskyi" {
                 isApproved = true
             }
-            approved = append(approved, " " + emoji.User.Username)
+            approved = append(approved, " "+emoji.User.Username)
         }
         res = append(res, MR{
             Link:         mr.WebURL,
@@ -108,11 +108,11 @@ func getMrs(pid int, pName string) []MR {
 }
 
 type gui struct {
-    mrs         []MR
-    owner       *widgets.Paragraph
-    list        *widgets.List
-    approvals   *widgets.List
-    info        *widgets.Paragraph
+    mrs       []MR
+    owner     *widgets.Paragraph
+    list      *widgets.List
+    approvals *widgets.List
+    info      *widgets.Paragraph
 }
 
 func newGui(mrs []MR) *gui {
@@ -135,11 +135,11 @@ func newGui(mrs []MR) *gui {
     a.SetRect(100, 3, 120, 33)
 
     res := &gui{
-        mrs:         mrs,
-        owner:       o,
-        list:        l,
-        info:        p,
-        approvals:   a,
+        mrs:       mrs,
+        owner:     o,
+        list:      l,
+        info:      p,
+        approvals: a,
     }
     res.setMRS(mrs)
     return res
@@ -163,8 +163,6 @@ func (g *gui) setMRS(mrs []MR) {
 
 func (g *gui) render(key string) {
     switch key {
-    case "q", "<C-c>":
-        return
     case "j", "<Down>", "о":
         g.list.ScrollDown()
     case "k", "<Up>", "л":
