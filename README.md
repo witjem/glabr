@@ -1,5 +1,5 @@
 ## GLab-MR
-CLI UI tools for monitoring GitLab merge requests
+Terminal UI tool for monitoring GitLab merge requests.
 
 Hotkeys:
 
@@ -7,4 +7,3 @@ Hotkeys:
 * k - Scroll up
 * q - Exit
 * o - Open MR in your browser
-
