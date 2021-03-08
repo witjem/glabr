@@ -73,19 +73,20 @@ func main() {
 
 func parseOpts() (Opts, error) {
     current, _ := usr.Current()
-    jsonFile, err := os.Open(current.HomeDir + "/.glab_mr.json")
+    fileName := ".glab_mr.json"
+    jsonFile, err := os.Open(current.HomeDir + "/" + fileName)
     if err != nil {
-        return Opts{}, fmt.Errorf("~/.glab_mr.json not found")
+        return Opts{}, fmt.Errorf("%s not found", fileName)
     }
     defer jsonFile.Close()
     bytes, err := ioutil.ReadAll(jsonFile)
     if err != nil {
-        return Opts{}, fmt.Errorf("fail read ~/.glab_mr.json")
+        return Opts{}, fmt.Errorf("fail read %s", fileName)
     }
     var opts Opts
     err = json.Unmarshal(bytes, &opts)
     if err != nil {
-        return Opts{}, fmt.Errorf("fail parse ~/.glab_mr.json")
+        return Opts{}, fmt.Errorf("fail parse %s", fileName)
     }
     return opts, nil
 }
