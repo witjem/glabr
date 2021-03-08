@@ -5,14 +5,15 @@ Terminal UI tool was written to help to monitor GitLab merge requests.
 ## How use
 
 Create config `~/.glab_mr.json`
-```json
+```js
 {
-  "gitlab_base_url": "string",
-  "gitlab_token": "string",
-  "gitlab_username": "string",
+  "gitlab_base_url": "https://gitlab.com",
+  "gitlab_token": "your_token",
+  "gitlab_username": "your_username",
   "projects": {
-    "{{project_name_1}}": {{project_id_1}},
-    "{{project_name_2}}": {{project_id_2}},
+    //project alias, and project id
+    "gtw": 123,
+    "mqq": 241
   }
 }
 ```
@@ -22,5 +23,4 @@ Hotkeys:
 * k, Down - Scroll up
 * q - Exit
 * o - Open MR in your browser
-
 
