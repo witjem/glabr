@@ -11,6 +11,7 @@ import (
     "os"
     "os/exec"
     usr "os/user"
+    "runtime"
     "syscall"
     "time"
     "unsafe"
@@ -39,12 +40,14 @@ func main() {
     }
     defer termui.Close()
 
-    ui := newUI()
-    ui.render()
+    ui := NewUI()
+    ui.Render()
 
     gitlabUpdates := make(chan []MR, 1)
     go func() {
-        gitlabUpdates <- gitlabClient.getAllMrs()
+        if mrs, err := gitlabClient.getAllMrs(); err == nil {
+            gitlabUpdates <- mrs
+        }
         time.Sleep(10 * time.Second)
     }()
     events := termui.PollEvents()
@@ -62,9 +65,9 @@ func main() {
                 openURLInBrowser(ui.CurrentMR().Link)
             }
         case mrs := <-gitlabUpdates:
-            ui.updateMrs(mrs)
+            ui.UpdateMrs(mrs)
         }
-        ui.render()
+        ui.Render()
     }
 }
 
@@ -114,31 +117,38 @@ func NewGitLab(opts Opts) (*GitLabClient, error) {
     }, nil
 }
 
-func (g *GitLabClient) getAllMrs() []MR {
+func (g *GitLabClient) getAllMrs() ([]MR, error) {
     var mrsM [][]MR
     for project, id := range g.projects {
-        mrsM = append(mrsM, g.getMrs(id, project))
+        mrs, err := g.getMrs(id, project)
+        if err != nil {
+            return nil, err
+        }
+        mrsM = append(mrsM, mrs)
     }
     var mrs []MR
     for _, mr := range mrsM {
         mrs = append(mrs, mr...)
     }
-    return mrs
+    return mrs, nil
 }
 
-func (g *GitLabClient) getMrs(pid int, pName string) []MR {
-    mrs, _, _ := g.client.MergeRequests.ListProjectMergeRequests(pid, &gitlab.ListProjectMergeRequestsOptions{
-        ListOptions: gitlab.ListOptions{
-            Page:    0,
-            PerPage: 10,
-        },
-        State: gitlab.String("opened"),
+func (g *GitLabClient) getMrs(pid int, pName string) ([]MR, error) {
+    mrs, _, err := g.client.MergeRequests.ListProjectMergeRequests(pid, &gitlab.ListProjectMergeRequestsOptions{
+        ListOptions: gitlab.ListOptions{PerPage: 10},
+        State:       gitlab.String("opened"),
     })
-    res := []MR{}
+    if err != nil {
+        return nil, err
+    }
+    var res []MR
     for _, mr := range mrs {
-        emojis, _, _ := g.client.AwardEmoji.ListMergeRequestAwardEmoji(pid, mr.IID, &gitlab.ListAwardEmojiOptions{PerPage: 10})
+        emojis, _, err := g.client.AwardEmoji.ListMergeRequestAwardEmoji(pid, mr.IID, &gitlab.ListAwardEmojiOptions{PerPage: 10})
+        if err != nil {
+            return nil, err
+        }
         isApproved := false
-        approved := []string{}
+        var approved []string
         for _, emoji := range emojis {
             if emoji.User.Username == g.username {
                 isApproved = true
@@ -154,10 +164,10 @@ func (g *GitLabClient) getMrs(pid int, pName string) []MR {
             Approved:     approved,
         })
     }
-    return res
+    return res, nil
 }
 
-type ui struct {
+type UI struct {
     mrs           []MR
     ownerView     *widgets.Paragraph
     listView      *widgets.List
@@ -165,7 +175,7 @@ type ui struct {
     linkView      *widgets.Paragraph
 }
 
-func newUI() *ui {
+func NewUI() *UI {
     maxX, maxY := termSize()
 
     listView := widgets.NewList()
@@ -186,7 +196,7 @@ func newUI() *ui {
     approvalsView.Title = "Approvals"
     approvalsView.SetRect(innerX, 4, maxX, maxY)
 
-    res := &ui{
+    res := &UI{
         mrs: []MR{
             {
                 Link:         "",
@@ -205,7 +215,7 @@ func newUI() *ui {
     return res
 }
 
-func (u *ui) updateMrs(mrs []MR) {
+func (u *UI) UpdateMrs(mrs []MR) {
     u.listView.Rows = []string{}
     for _, mr := range mrs {
         approveSymbol := " "
@@ -222,31 +232,36 @@ func (u *ui) updateMrs(mrs []MR) {
     u.listView.SelectedRow = 0
 }
 
-func (u *ui) render() {
+func (u *UI) Render() {
     u.linkView.Text = " " + u.mrs[u.listView.SelectedRow].Link
     u.ownerView.Text = " " + u.mrs[u.listView.SelectedRow].Owner
     u.approvalsView.Rows = u.mrs[u.listView.SelectedRow].Approved
     termui.Render(u.listView, u.linkView, u.approvalsView, u.ownerView)
 }
 
-func (u *ui) ScrollDown() {
+func (u *UI) ScrollDown() {
     u.listView.ScrollDown()
 }
 
-func (u *ui) ScrollUp() {
+func (u *UI) ScrollUp() {
     u.listView.ScrollUp()
 }
 
-func (u *ui) CurrentMR() MR {
+func (u *UI) CurrentMR() MR {
     return u.mrs[u.listView.SelectedRow]
 }
 
-// only works on the macos
 func openURLInBrowser(url string) {
-    exec.Command("open", url).Start()
+    switch runtime.GOOS {
+    case "linux":
+        _ = exec.Command("xdg-open", url).Start()
+    case "windows":
+        _ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+    case "darwin":
+        _ = exec.Command("open", url).Start()
+    }
 }
 
-// only works on the macos, and linux
 func termSize() (int, int) {
     var sz struct {
         rows    uint16
