@@ -45,10 +45,12 @@ func main() {
 
     gitlabUpdates := make(chan []MR, 1)
     go func() {
-        if mrs, err := gitlabClient.getAllMrs(); err == nil {
-            gitlabUpdates <- mrs
+        for {
+            if mrs, err := gitlabClient.getAllMrs(); err == nil {
+                gitlabUpdates <- mrs
+            }
+            time.Sleep(10 * time.Second)
         }
-        time.Sleep(10 * time.Second)
     }()
     events := termui.PollEvents()
     for {
@@ -98,6 +100,7 @@ type MR struct {
     ApprovedByMe bool
     Owner        string
     Approved     []string
+    IsOwner      bool
 }
 
 type GitLabClient struct {
@@ -156,12 +159,17 @@ func (g *GitLabClient) getMrs(pid int, pName string) ([]MR, error) {
             }
             approved = append(approved, " "+emoji.User.Username)
         }
+        isOwner := false
+        if mr.Author.Username == g.username {
+            isOwner = true
+        }
         res = append(res, MR{
             Link:         mr.WebURL,
             Project:      pName,
             Title:        mr.Title,
             ApprovedByMe: isApproved,
             Owner:        mr.Author.Username,
+            IsOwner:      isOwner,
             Approved:     approved,
         })
     }
@@ -224,7 +232,7 @@ func (u *UI) UpdateMrs(mrs []MR) {
             approveSymbol = "✓"
         }
         myMrSymbol := "  "
-        if mr.ApprovedByMe {
+        if mr.IsOwner {
             myMrSymbol = "my"
         }
         u.listView.Rows = append(u.listView.Rows, fmt.Sprintf("[%s] [%s] [%s] %s", approveSymbol, myMrSymbol, mr.Project, mr.Title))
