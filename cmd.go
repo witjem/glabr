@@ -12,6 +12,7 @@ import (
     "os/exec"
     usr "os/user"
     "runtime"
+    "sort"
     "syscall"
     "time"
     "unsafe"
@@ -103,6 +104,21 @@ type MR struct {
     IsOwner      bool
 }
 
+// impl sort.Interface for MRs models
+type ByTitle []MR
+
+func (b ByTitle) Len() int {
+    return len(b)
+}
+
+func (b ByTitle) Swap(i, j int) {
+    b[i], b[j] = b[j], b[i]
+}
+
+func (b ByTitle) Less(i, j int) bool {
+    return b[i].Title < b[j].Title
+}
+
 type GitLabClient struct {
     projects map[string]int
     username string
@@ -134,6 +150,7 @@ func (g *GitLabClient) getAllMrs() ([]MR, error) {
     for _, mr := range mrsM {
         mrs = append(mrs, mr...)
     }
+    sort.Sort(ByTitle(mrs))
     return mrs, nil
 }
 
