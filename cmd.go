@@ -245,7 +245,7 @@ func (u *UI) UpdateMrs(mrs []MR) {
     u.listView.Rows = []string{}
     for _, mr := range mrs {
         approveSymbol := " "
-        if mr.ApprovedByMe {
+        if mr.ApprovedByMe || (mr.IsOwner && len(mr.Approved) > 0) {
             approveSymbol = "✓"
         }
         myMrSymbol := "  "
