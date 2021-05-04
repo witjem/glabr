@@ -1,3 +1,2 @@
 .idea/
-glab-mr
-http-client.private.env.json
+.dist/
