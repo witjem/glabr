@@ -1,9 +1,0 @@
-### Get opened merge request
-GET {{host}}/projects/{{project_id}}/merge_requests?state=opened
-Accept: application/json
-PRIVATE-TOKEN: {{token}}
-
-### Get merge request emoji
-GET {{host}}/projects/{{project_id}}/merge_requests/{{merge_request_iid}}/award_emoji
-Accept: application/json
-PRIVATE-TOKEN: {{token}}
